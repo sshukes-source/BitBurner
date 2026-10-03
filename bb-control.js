@@ -6,212 +6,256 @@ export async function main(ns) {
     // BITBURNER CONTROL CENTER
     // ============================================================
     //
-    // Central launcher for:
+    // Persistent control service + persistent left sidebar menu.
     //
-    //   bb-overview.js
-    //   bb-targets.js
-    //   bb-workers.js
-    //   bb-opportunities.js
-    //   bb-income.js
-    //   bb-dispatcher.js
+    // START:
     //
-    // Plus existing utility scripts.
+    //     run bb-control.js
     //
-    // Features:
+    // The sidebar then provides:
     //
-    //   - Detects already-running monitors
-    //   - Opens existing tail instead of duplicating scripts
-    //   - Dispatcher start/configuration menu
-    //   - Dispatcher stop/restart
-    //   - Suite process/status viewer
-    //   - Stop all bb-* scripts
-    //   - Legacy utility launcher
+    //     BB Control
+    //       Overview
+    //       Targets
+    //       Workers
+    //       Opportunities
+    //       Income
+    //       Dispatcher
+    //       Open All
+    //       Stop Dispatcher
+    //
+    // Clicking an entry:
+    //
+    //   - Opens an already-running script's tail
+    //   - OR starts the script if it is not running
     //
     // ============================================================
 
 
     // ============================================================
-    // CONFIGURATION
+    // CONFIG
     // ============================================================
 
     const CONFIG = {
 
-        home:
-            "home",
+        refreshMs: 1000,
 
-        // Scripts considered part of the BB control suite.
-        suiteScripts: [
-            "bb-control.js",
-            "bb-overview.js",
-            "bb-targets.js",
-            "bb-workers.js",
-            "bb-opportunities.js",
-            "bb-income.js",
-            "bb-dispatcher.js",
-            "bb-hack-worker.js",
-            "bb-grow-worker.js",
-            "bb-weaken-worker.js"
+        windowWidth: 1080,
+        windowHeight: 700,
+
+        separatorWidth: 100,
+
+        sidebarHook:
+            "sidebar-extra-hook-0",
+
+        sidebarRootId:
+            "bb-control-sidebar-root",
+
+        dispatcherDefaults: [
+            "--hack",
+            0.05,
+
+            "--reserve",
+            8,
+
+            "--gap",
+            100,
+
+            "--max-batches",
+            25
         ]
     };
 
 
     // ============================================================
-    // MONITOR DEFINITIONS
+    // MONITORS
     // ============================================================
 
     const MONITORS = [
 
         {
-            label:
-                "Operations Overview",
-
-            icon:
-                "📊",
-
-            script:
-                "bb-overview.js",
-
-            description:
-                "Overall player, network, target and RAM status"
+            id: "overview",
+            name: "Overview",
+            script: "bb-overview.js",
+            icon: "▣"
         },
 
         {
-            label:
-                "Target Analyzer",
-
-            icon:
-                "🎯",
-
-            script:
-                "bb-targets.js",
-
-            description:
-                "Target profitability and HGW efficiency"
+            id: "targets",
+            name: "Targets",
+            script: "bb-targets.js",
+            icon: "◎"
         },
 
         {
-            label:
-                "Worker Monitor",
-
-            icon:
-                "🖥",
-
-            script:
-                "bb-workers.js",
-
-            description:
-                "RAM, workers, threads and target distribution"
+            id: "workers",
+            name: "Workers",
+            script: "bb-workers.js",
+            icon: "▤"
         },
 
         {
-            label:
-                "Opportunity Monitor",
-
-            icon:
-                "🔔",
-
-            script:
-                "bb-opportunities.js",
-
-            description:
-                "Rooting, hacking, contracts and conflicts"
+            id: "opportunities",
+            name: "Opportunities",
+            script: "bb-opportunities.js",
+            icon: "!"
         },
 
         {
-            label:
-                "Income Analyzer",
-
-            icon:
-                "💵",
-
-            script:
-                "bb-income.js",
-
-            description:
-                "Actual income, trends and target performance"
+            id: "income",
+            name: "Income",
+            script: "bb-income.js",
+            icon: "$"
         }
     ];
 
 
     // ============================================================
-    // LEGACY / UTILITY SCRIPTS
+    // UTILITY SCRIPTS
     // ============================================================
 
     const UTILITIES = [
 
         {
-            label:
-                "Server Dashboard",
-
-            icon:
-                "🌐",
-
+            id: "dashboard",
+            name: "Dashboard",
             scripts: [
                 "dashboard.js"
             ]
         },
 
         {
-            label:
-                "Server Scanner",
-
-            icon:
-                "🔎",
-
+            id: "scan",
+            name: "Server Scan",
             scripts: [
                 "scanAllServers.js"
             ]
         },
 
         {
-            label:
-                "Zero-RAM Targets",
-
-            icon:
-                "💰",
-
+            id: "zero",
+            name: "Zero-RAM Targets",
             scripts: [
                 "zeroRamTargets.js"
             ]
         },
 
         {
-            label:
-                "Coding Contracts",
-
-            icon:
-                "📜",
-
+            id: "contracts",
+            name: "Contracts",
             scripts: [
                 "find-contracts.js",
-                "contracts.js"
-            ]
-        },
-
-        {
-            label:
-                "Admin / Rooted Servers",
-
-            icon:
-                "🔓",
-
-            scripts: [
-                "scanAdminServers.js"
-            ]
-        },
-
-        {
-            label:
-                "Running Servers",
-
-            icon:
-                "⚙",
-
-            scripts: [
-                "scanRunningServers.js"
+                "findContracts.js"
             ]
         }
     ];
+
+
+    // ============================================================
+    // SUITE SCRIPTS
+    // ============================================================
+
+    const SUITE = [
+
+        "bb-overview.js",
+        "bb-targets.js",
+        "bb-workers.js",
+        "bb-opportunities.js",
+        "bb-income.js",
+
+        "bb-dispatcher.js",
+
+        "bb-hack-worker.js",
+        "bb-grow-worker.js",
+        "bb-weaken-worker.js"
+    ];
+
+
+    // ============================================================
+    // ONLY ALLOW ONE CONTROL INSTANCE
+    // ============================================================
+
+    const existing =
+        findOtherControlProcess(
+            ns
+        );
+
+
+    if (existing) {
+
+        try {
+
+            ns.ui.openTail(
+                existing.pid
+            );
+
+        }
+        catch {
+            // Ignore.
+        }
+
+
+        ns.tprint(
+            `bb-control.js already running. PID ${existing.pid}`
+        );
+
+
+        return;
+    }
+
+
+    // ============================================================
+    // OPEN CONTROL WINDOW
+    // ============================================================
+
+    ns.ui.openTail();
+
+
+    ns.ui.resizeTail(
+        CONFIG.windowWidth,
+        CONFIG.windowHeight
+    );
+
+
+    ns.ui.setTailTitle(
+        "BITBURNER // CONTROL CENTER"
+    );
+
+
+    // ============================================================
+    // INSTALL SIDEBAR
+    // ============================================================
+
+    installSidebar(
+        ns,
+        CONFIG,
+        MONITORS,
+        UTILITIES
+    );
+
+
+    // ============================================================
+    // CLEANUP
+    // ============================================================
+
+    ns.atExit(
+        () => {
+
+            removeSidebar(
+                CONFIG
+            );
+        }
+    );
+
+
+    // ============================================================
+    // STATE
+    // ============================================================
+
+    let lastDisplay = "";
+
+    let lastAction =
+        "Control center started";
 
 
     // ============================================================
@@ -220,72 +264,220 @@ export async function main(ns) {
 
     while (true) {
 
-        const network =
-            scanNetwork(ns);
+        // ========================================================
+        // SIDEBAR MAY GET REBUILT BY GAME UI
+        // ========================================================
 
-
-        const menu =
-            buildMainMenu(
-                ns,
-                MONITORS,
-                UTILITIES,
-                network
-            );
-
-
-        const choice =
-            await ns.prompt(
-                buildMainTitle(
-                    ns,
-                    network
-                ),
-                {
-                    type:
-                        "select",
-
-                    choices:
-                        menu.map(
-                            item =>
-                                item.display
-                        )
-                }
-            );
-
-
-        if (!choice) {
-            return;
-        }
-
-
-        const selected =
-            menu.find(
-                item =>
-                    item.display ===
-                    choice
-            );
-
-
-        if (!selected) {
-            continue;
-        }
+        ensureSidebar(
+            ns,
+            CONFIG,
+            MONITORS,
+            UTILITIES
+        );
 
 
         // ========================================================
-        // MONITOR
+        // READ SIDEBAR COMMAND
         // ========================================================
+
+        const root =
+            document.getElementById(
+                CONFIG.sidebarRootId
+            );
+
 
         if (
-            selected.type ===
-            "monitor"
+            root &&
+            root.dataset.command
         ) {
 
-            await openOrLaunchMonitor(
+            const command =
+                root.dataset.command;
+
+
+            root.dataset.command =
+                "";
+
+
+            lastAction =
+                await executeSidebarCommand(
+                    ns,
+                    command,
+                    CONFIG,
+                    MONITORS,
+                    UTILITIES,
+                    SUITE
+                );
+        }
+
+
+        // ========================================================
+        // NETWORK STATUS
+        // ========================================================
+
+        const network =
+            scanNetwork(
+                ns
+            );
+
+
+        const stats =
+            getSystemStats(
                 ns,
-                selected.monitor,
                 network
             );
 
-            continue;
+
+        const dispatcher =
+            findProcessesByScript(
+                ns,
+                network,
+                "bb-dispatcher.js"
+            );
+
+
+        // ========================================================
+        // UPDATE SIDEBAR STATES
+        // ========================================================
+
+        updateSidebarStates(
+            ns,
+            CONFIG,
+            MONITORS,
+            dispatcher.length > 0,
+            network
+        );
+
+
+        // ========================================================
+        // CONTROL WINDOW DISPLAY
+        // ========================================================
+
+        const lines = [];
+
+
+        lines.push(
+            "═".repeat(
+                CONFIG.separatorWidth
+            )
+        );
+
+
+        lines.push(
+            centerText(
+                "BITBURNER CONTROL CENTER",
+                CONFIG.separatorWidth
+            )
+        );
+
+
+        lines.push(
+            "═".repeat(
+                CONFIG.separatorWidth
+            )
+        );
+
+
+        lines.push("");
+
+
+        lines.push(
+
+            `Hack Level: ${stats.hackLevel}`
+                .padEnd(25) +
+
+            `Money: $${ns.format.number(
+                stats.money,
+                2
+            )}`
+                .padEnd(34) +
+
+            `Income: $${ns.format.number(
+                stats.income,
+                2
+            )}/sec`
+        );
+
+
+        lines.push(
+
+            `Servers: ${stats.serverCount}`
+                .padEnd(25) +
+
+            `Rooted: ${stats.rooted}`
+                .padEnd(34) +
+
+            `RAM Used: ${stats.ramPercent.toFixed(1)}%`
+        );
+
+
+        // ========================================================
+        // MONITORS
+        // ========================================================
+
+        lines.push("");
+
+        lines.push(
+            "[ MONITORS ]"
+        );
+
+        lines.push(
+            "─".repeat(
+                CONFIG.separatorWidth
+            )
+        );
+
+
+        for (
+            const monitor
+            of MONITORS
+        ) {
+
+            const running =
+                findProcessesByScript(
+                    ns,
+                    network,
+                    monitor.script
+                );
+
+
+            let status;
+
+
+            if (
+                !ns.fileExists(
+                    monitor.script,
+                    "home"
+                )
+            ) {
+
+                status =
+                    "MISSING";
+            }
+            else if (
+                running.length > 0
+            ) {
+
+                status =
+                    `RUNNING  PID ${running[0].pid}`;
+            }
+            else {
+
+                status =
+                    "STOPPED";
+            }
+
+
+            lines.push(
+
+                monitor.name
+                    .padEnd(22) +
+
+                monitor.script
+                    .padEnd(32) +
+
+                status
+            );
         }
 
 
@@ -293,141 +485,506 @@ export async function main(ns) {
         // DISPATCHER
         // ========================================================
 
+        lines.push("");
+
+        lines.push(
+            "[ DISPATCHER ]"
+        );
+
+        lines.push(
+            "─".repeat(
+                CONFIG.separatorWidth
+            )
+        );
+
+
         if (
-            selected.action ===
-            "dispatcher"
+            dispatcher.length > 0
         ) {
 
-            await dispatcherMenu(
-                ns,
-                network
+            lines.push(
+
+                "Status: RUNNING"
+                    .padEnd(25) +
+
+                `PID: ${dispatcher[0].pid}`
+                    .padEnd(20) +
+
+                `Args: ${dispatcher[0].args.join(" ")}`
             );
 
-            continue;
+        }
+        else {
+
+            lines.push(
+                "Status: STOPPED"
+            );
         }
 
 
         // ========================================================
-        // OPEN ALL MONITORS
+        // SIDEBAR HELP
         // ========================================================
 
+        lines.push("");
+
+        lines.push(
+            "[ SIDEBAR CONTROL ]"
+        );
+
+        lines.push(
+            "─".repeat(
+                CONFIG.separatorWidth
+            )
+        );
+
+
+        lines.push(
+            "Use the persistent BB Control menu in the left sidebar."
+        );
+
+
+        lines.push("");
+
+        lines.push(
+            "Selecting a monitor:"
+        );
+
+        lines.push(
+            "  • Opens its existing tail if already running"
+        );
+
+        lines.push(
+            "  • Starts it automatically if stopped"
+        );
+
+
+        lines.push("");
+
+        lines.push(
+            "Dispatcher:"
+        );
+
+        lines.push(
+            "  • Opens dispatcher if running"
+        );
+
+        lines.push(
+            "  • Starts dispatcher with conservative defaults if stopped"
+        );
+
+
+        // ========================================================
+        // ACTIVITY
+        // ========================================================
+
+        lines.push("");
+
+        lines.push(
+            "[ LAST ACTION ]"
+        );
+
+        lines.push(
+            "─".repeat(
+                CONFIG.separatorWidth
+            )
+        );
+
+
+        lines.push(
+            lastAction
+        );
+
+
+        lines.push("");
+
+        lines.push(
+            "BB Control remains active while all dashboards remain open."
+        );
+
+
+        // ========================================================
+        // REDRAW
+        // ========================================================
+
+        const display =
+            lines.join("\n");
+
+
         if (
-            selected.action ===
-            "open-all"
+            display !==
+            lastDisplay
         ) {
 
-            await openAllMonitors(
-                ns,
-                MONITORS,
-                network
+            ns.clearLog();
+
+            ns.print(
+                display
             );
 
-            continue;
+
+            lastDisplay =
+                display;
         }
 
 
         // ========================================================
-        // SUITE STATUS
+        // WINDOW TITLE
         // ========================================================
 
-        if (
-            selected.action ===
-            "suite-status"
-        ) {
+        ns.ui.setTailTitle(
 
-            await showSuiteStatus(
-                ns,
-                CONFIG,
-                network
-            );
+            `CONTROL | ` +
 
-            continue;
-        }
+            `$${ns.format.number(
+                stats.income,
+                2
+            )}/sec | ` +
 
+            `RAM ${stats.ramPercent.toFixed(0)}% | ` +
 
-        // ========================================================
-        // ALL RUNNING SCRIPTS
-        // ========================================================
-
-        if (
-            selected.action ===
-            "all-processes"
-        ) {
-
-            await showAllProcesses(
-                ns,
-                network
-            );
-
-            continue;
-        }
+            (
+                dispatcher.length > 0
+                    ? "DISPATCHER ON"
+                    : "DISPATCHER OFF"
+            )
+        );
 
 
-        // ========================================================
-        // UTILITY SCRIPT
-        // ========================================================
-
-        if (
-            selected.type ===
-            "utility"
-        ) {
-
-            await launchUtility(
-                ns,
-                selected.utility,
-                network
-            );
-
-            continue;
-        }
-
-
-        // ========================================================
-        // STOP SUITE
-        // ========================================================
-
-        if (
-            selected.action ===
-            "stop-suite"
-        ) {
-
-            await stopSuite(
-                ns,
-                CONFIG,
-                network
-            );
-
-            continue;
-        }
-
-
-        // ========================================================
-        // EXIT
-        // ========================================================
-
-        if (
-            selected.action ===
-            "exit"
-        ) {
-
-            return;
-        }
+        await ns.sleep(
+            CONFIG.refreshMs
+        );
     }
 }
 
 
 // =================================================================
-// BUILD MAIN MENU
+// INSTALL SIDEBAR
 // =================================================================
 
-function buildMainMenu(
+function installSidebar(
     ns,
-    monitors,
-    utilities,
-    network
+    CONFIG,
+    MONITORS,
+    UTILITIES
 ) {
 
-    const menu = [];
+    const hook =
+        document.getElementById(
+            CONFIG.sidebarHook
+        );
+
+
+    if (!hook) {
+
+        return false;
+    }
+
+
+    removeSidebar(
+        CONFIG
+    );
+
+
+    // =============================================================
+    // ROOT
+    // =============================================================
+
+    const root =
+        document.createElement(
+            "div"
+        );
+
+
+    root.id =
+        CONFIG.sidebarRootId;
+
+
+    root.dataset.command =
+        "";
+
+
+    root.style.width =
+        "100%";
+
+
+    root.style.boxSizing =
+        "border-box";
+
+
+    root.style.fontFamily =
+        "inherit";
+
+
+    // =============================================================
+    // HEADER
+    // =============================================================
+
+    const header =
+        document.createElement(
+            "button"
+        );
+
+
+    header.id =
+        `${CONFIG.sidebarRootId}-header`;
+
+
+    header.type =
+        "button";
+
+
+    header.style.width =
+        "100%";
+
+
+    header.style.minHeight =
+        "46px";
+
+
+    header.style.border =
+        "none";
+
+
+    header.style.outline =
+        "none";
+
+
+    header.style.background =
+        "transparent";
+
+
+    header.style.color =
+        "inherit";
+
+
+    header.style.font =
+        "inherit";
+
+
+    header.style.display =
+        "flex";
+
+
+    header.style.alignItems =
+        "center";
+
+
+    header.style.padding =
+        "8px 16px";
+
+
+    header.style.cursor =
+        "pointer";
+
+
+    header.style.gap =
+        "12px";
+
+
+    // =============================================================
+    // HEADER ICON
+    // =============================================================
+
+    const headerIcon =
+        document.createElement(
+            "span"
+        );
+
+
+    headerIcon.textContent =
+        "⚡";
+
+
+    headerIcon.style.fontSize =
+        "20px";
+
+
+    headerIcon.style.width =
+        "28px";
+
+
+    headerIcon.style.textAlign =
+        "center";
+
+
+    // =============================================================
+    // HEADER LABEL
+    // =============================================================
+
+    const headerText =
+        document.createElement(
+            "span"
+        );
+
+
+    headerText.textContent =
+        "BB Control";
+
+
+    headerText.style.flex =
+        "1";
+
+
+    headerText.style.textAlign =
+        "left";
+
+
+    // =============================================================
+    // DISPATCHER STATUS
+    // =============================================================
+
+    const statusDot =
+        document.createElement(
+            "span"
+        );
+
+
+    statusDot.id =
+        `${CONFIG.sidebarRootId}-dispatcher-status`;
+
+
+    statusDot.textContent =
+        "●";
+
+
+    statusDot.style.fontSize =
+        "10px";
+
+
+    statusDot.style.color =
+        "#777";
+
+
+    // =============================================================
+    // EXPAND ARROW
+    // =============================================================
+
+    const arrow =
+        document.createElement(
+            "span"
+        );
+
+
+    arrow.id =
+        `${CONFIG.sidebarRootId}-arrow`;
+
+
+    arrow.textContent =
+        "▾";
+
+
+    arrow.style.width =
+        "18px";
+
+
+    arrow.style.textAlign =
+        "center";
+
+
+    // =============================================================
+    // MENU BODY
+    // =============================================================
+
+    const menu =
+        document.createElement(
+            "div"
+        );
+
+
+    menu.id =
+        `${CONFIG.sidebarRootId}-menu`;
+
+
+    menu.style.display =
+        "block";
+
+
+    menu.style.width =
+        "100%";
+
+
+    // =============================================================
+    // HEADER CLICK
+    // =============================================================
+
+    header.addEventListener(
+        "click",
+        () => {
+
+            const open =
+                menu.style.display !==
+                "none";
+
+
+            if (open) {
+
+                menu.style.display =
+                    "none";
+
+
+                arrow.textContent =
+                    "▸";
+            }
+            else {
+
+                menu.style.display =
+                    "block";
+
+
+                arrow.textContent =
+                    "▾";
+            }
+        }
+    );
+
+
+    addHover(
+        header
+    );
+
+
+    header.appendChild(
+        headerIcon
+    );
+
+
+    header.appendChild(
+        headerText
+    );
+
+
+    header.appendChild(
+        statusDot
+    );
+
+
+    header.appendChild(
+        arrow
+    );
+
+
+    root.appendChild(
+        header
+    );
+
+
+    // =============================================================
+    // CONTROL CENTER WINDOW
+    // =============================================================
+
+    addSidebarItem(
+        menu,
+        "control",
+        "▦",
+        "Control Center",
+        CONFIG
+    );
+
+
+    addDivider(
+        menu
+    );
 
 
     // =============================================================
@@ -436,120 +993,58 @@ function buildMainMenu(
 
     for (
         const monitor
-        of monitors
+        of MONITORS
     ) {
 
-        const running =
-            findProcessesByScript(
-                ns,
-                network,
-                monitor.script
-            );
-
-
-        const available =
-            ns.fileExists(
-                monitor.script,
-                "home"
-            );
-
-
-        let status;
-
-
-        if (!available) {
-
-            status =
-                "MISSING";
-        }
-        else if (
-            running.length > 0
-        ) {
-
-            status =
-                "RUNNING";
-        }
-        else {
-
-            status =
-                "READY";
-        }
-
-
-        menu.push({
-
-            type:
-                "monitor",
-
-            monitor,
-
-            display:
-                `${monitor.icon} ${monitor.label}` +
-                `  [${status}]`
-        });
+        addSidebarItem(
+            menu,
+            monitor.id,
+            monitor.icon,
+            monitor.name,
+            CONFIG
+        );
     }
 
 
-    // =============================================================
-    // AUTOMATION
-    // =============================================================
-
-    const dispatcher =
-        findProcessesByScript(
-            ns,
-            network,
-            "bb-dispatcher.js"
-        );
-
-
-    menu.push({
-
-        action:
-            "dispatcher",
-
-        display:
-            `⚔  Dispatcher Control  [` +
-            (
-                dispatcher.length > 0
-                    ? "RUNNING"
-                    : "STOPPED"
-            ) +
-            `]`
-    });
-
-
-    menu.push({
-
-        action:
-            "open-all",
-
-        display:
-            "🪟 Open / Start All Monitors"
-    });
+    addDivider(
+        menu
+    );
 
 
     // =============================================================
-    // STATUS
+    // DISPATCHER
     // =============================================================
 
-    menu.push({
+    addSidebarItem(
+        menu,
+        "dispatcher",
+        "▶",
+        "Dispatcher",
+        CONFIG
+    );
 
-        action:
-            "suite-status",
 
-        display:
-            "📋 BB Suite Status"
-    });
+    addSidebarItem(
+        menu,
+        "stop-dispatcher",
+        "■",
+        "Stop Dispatcher",
+        CONFIG
+    );
 
 
-    menu.push({
+    addSidebarItem(
+        menu,
+        "open-all",
+        "▦",
+        "Open All Monitors",
+        CONFIG
+    );
 
-        action:
-            "all-processes",
 
-        display:
-            "⚙  All Running Scripts"
-    });
+    addDivider(
+        menu
+    );
 
 
     // =============================================================
@@ -558,332 +1053,415 @@ function buildMainMenu(
 
     for (
         const utility
-        of utilities
+        of UTILITIES
     ) {
 
-        const script =
-            findExistingUtilityScript(
-                ns,
-                utility
-            );
+        addSidebarItem(
+            menu,
+            utility.id,
+            "›",
+            utility.name,
+            CONFIG
+        );
+    }
 
 
-        let status =
-            "MISSING";
+    root.appendChild(
+        menu
+    );
 
 
-        if (script) {
+    hook.appendChild(
+        root
+    );
 
-            const running =
-                findProcessesByScript(
-                    ns,
-                    network,
-                    script
+
+    return true;
+}
+
+
+// =================================================================
+// ADD SIDEBAR ITEM
+// =================================================================
+
+function addSidebarItem(
+    menu,
+    command,
+    iconText,
+    labelText,
+    CONFIG
+) {
+
+    const button =
+        document.createElement(
+            "button"
+        );
+
+
+    button.id =
+        `${CONFIG.sidebarRootId}-item-${command}`;
+
+
+    button.type =
+        "button";
+
+
+    button.style.width =
+        "100%";
+
+
+    button.style.minHeight =
+        "38px";
+
+
+    button.style.border =
+        "none";
+
+
+    button.style.outline =
+        "none";
+
+
+    button.style.background =
+        "transparent";
+
+
+    button.style.color =
+        "inherit";
+
+
+    button.style.font =
+        "inherit";
+
+
+    button.style.fontSize =
+        "13px";
+
+
+    button.style.display =
+        "flex";
+
+
+    button.style.alignItems =
+        "center";
+
+
+    button.style.gap =
+        "10px";
+
+
+    button.style.padding =
+        "6px 18px 6px 30px";
+
+
+    button.style.cursor =
+        "pointer";
+
+
+    button.style.textAlign =
+        "left";
+
+
+    // =============================================================
+    // ICON
+    // =============================================================
+
+    const icon =
+        document.createElement(
+            "span"
+        );
+
+
+    icon.textContent =
+        iconText;
+
+
+    icon.style.width =
+        "22px";
+
+
+    icon.style.textAlign =
+        "center";
+
+
+    // =============================================================
+    // LABEL
+    // =============================================================
+
+    const label =
+        document.createElement(
+            "span"
+        );
+
+
+    label.textContent =
+        labelText;
+
+
+    label.style.flex =
+        "1";
+
+
+    // =============================================================
+    // STATUS
+    // =============================================================
+
+    const status =
+        document.createElement(
+            "span"
+        );
+
+
+    status.id =
+        `${CONFIG.sidebarRootId}-state-${command}`;
+
+
+    status.textContent =
+        "";
+
+
+    status.style.fontSize =
+        "9px";
+
+
+    status.style.width =
+        "12px";
+
+
+    status.style.textAlign =
+        "center";
+
+
+    // =============================================================
+    // CLICK
+    // =============================================================
+
+    button.addEventListener(
+        "click",
+        () => {
+
+            const root =
+                document.getElementById(
+                    CONFIG.sidebarRootId
                 );
 
 
-            status =
-                running.length > 0
-                    ? "RUNNING"
-                    : "READY";
+            if (
+                root
+            ) {
+
+                root.dataset.command =
+                    command;
+            }
         }
+    );
 
 
-        menu.push({
-
-            type:
-                "utility",
-
-            utility,
-
-            display:
-                `${utility.icon} ${utility.label}` +
-                `  [${status}]`
-        });
-    }
+    addHover(
+        button
+    );
 
 
-    // =============================================================
-    // SYSTEM
-    // =============================================================
-
-    menu.push({
-
-        action:
-            "stop-suite",
-
-        display:
-            "🛑 Stop BB Suite"
-    });
+    button.appendChild(
+        icon
+    );
 
 
-    menu.push({
-
-        action:
-            "exit",
-
-        display:
-            "❌ Exit Control Center"
-    });
+    button.appendChild(
+        label
+    );
 
 
-    return menu;
+    button.appendChild(
+        status
+    );
+
+
+    menu.appendChild(
+        button
+    );
 }
 
 
 // =================================================================
-// MAIN TITLE
+// ADD DIVIDER
 // =================================================================
 
-function buildMainTitle(
-    ns,
-    network
-) {
+function addDivider(menu) {
 
-    const hackLevel =
-        ns.getHackingLevel();
-
-
-    const money =
-        ns.getServerMoneyAvailable(
-            "home"
+    const divider =
+        document.createElement(
+            "div"
         );
 
 
-    const income =
-        ns.getTotalScriptIncome()[0];
+    divider.style.height =
+        "1px";
 
 
-    let totalRam = 0;
+    divider.style.margin =
+        "4px 16px";
 
-    let usedRam = 0;
+
+    divider.style.background =
+        "rgba(255,255,255,0.12)";
 
 
-    for (
-        const server
-        of network
+    menu.appendChild(
+        divider
+    );
+}
+
+
+// =================================================================
+// HOVER EFFECT
+// =================================================================
+
+function addHover(element) {
+
+    element.addEventListener(
+        "mouseenter",
+        () => {
+
+            element.style.background =
+                "rgba(255,255,255,0.08)";
+        }
+    );
+
+
+    element.addEventListener(
+        "mouseleave",
+        () => {
+
+            element.style.background =
+                "transparent";
+        }
+    );
+}
+
+
+// =================================================================
+// ENSURE SIDEBAR
+// =================================================================
+
+function ensureSidebar(
+    ns,
+    CONFIG,
+    MONITORS,
+    UTILITIES
+) {
+
+    const existing =
+        document.getElementById(
+            CONFIG.sidebarRootId
+        );
+
+
+    if (
+        existing
+    ) {
+
+        return;
+    }
+
+
+    installSidebar(
+        ns,
+        CONFIG,
+        MONITORS,
+        UTILITIES
+    );
+}
+
+
+// =================================================================
+// REMOVE SIDEBAR
+// =================================================================
+
+function removeSidebar(CONFIG) {
+
+    const existing =
+        document.getElementById(
+            CONFIG.sidebarRootId
+        );
+
+
+    if (
+        existing
+    ) {
+
+        existing.remove();
+    }
+}
+
+
+// =================================================================
+// UPDATE SIDEBAR STATES
+// =================================================================
+
+function updateSidebarStates(
+    ns,
+    CONFIG,
+    MONITORS,
+    dispatcherRunning,
+    network
+) {
+
+    // =============================================================
+    // DISPATCHER DOT IN HEADER
+    // =============================================================
+
+    const dispatcherStatus =
+        document.getElementById(
+            `${CONFIG.sidebarRootId}-dispatcher-status`
+        );
+
+
+    if (
+        dispatcherStatus
     ) {
 
         if (
-            !ns.hasRootAccess(
-                server
-            )
+            dispatcherRunning
         ) {
 
-            continue;
+            dispatcherStatus.style.color =
+                "#00c853";
+
+
+            dispatcherStatus.title =
+                "Dispatcher running";
         }
+        else {
+
+            dispatcherStatus.style.color =
+                "#777";
 
 
-        totalRam +=
-            ns.getServerMaxRam(
-                server
-            );
-
-
-        usedRam +=
-            ns.getServerUsedRam(
-                server
-            );
-    }
-
-
-    const ramPercent =
-        totalRam > 0
-            ? (
-                usedRam /
-                totalRam
-            ) * 100
-            : 0;
-
-
-    return (
-
-        "BITBURNER CONTROL CENTER\n\n" +
-
-        `Hack Level: ${hackLevel}\n` +
-
-        `Money: $${ns.format.number(
-            money,
-            2
-        )}\n` +
-
-        `Income: $${ns.format.number(
-            income,
-            2
-        )}/sec\n` +
-
-        `Network RAM: ${ramPercent.toFixed(1)}% used`
-    );
-}
-
-
-// =================================================================
-// OPEN OR LAUNCH MONITOR
-// =================================================================
-
-async function openOrLaunchMonitor(
-    ns,
-    monitor,
-    network
-) {
-
-    if (
-        !ns.fileExists(
-            monitor.script,
-            "home"
-        )
-    ) {
-
-        await ns.alert(
-
-            `${monitor.label}\n\n` +
-
-            `Script not found:\n` +
-
-            `${monitor.script}`
-        );
-
-
-        return;
-    }
-
-
-    const running =
-        findProcessesByScript(
-            ns,
-            network,
-            monitor.script
-        );
-
-
-    // -------------------------------------------------------------
-    // ALREADY RUNNING
-    // -------------------------------------------------------------
-
-    if (
-        running.length > 0
-    ) {
-
-        const process =
-            running[0];
-
-
-        try {
-
-            ns.ui.openTail(
-                process.pid
-            );
-
-
-            ns.toast(
-                `Opened ${monitor.label}`,
-                "info",
-                2500
-            );
-
+            dispatcherStatus.title =
+                "Dispatcher stopped";
         }
-        catch {
-
-            await ns.alert(
-
-                `${monitor.label} is already running.\n\n` +
-
-                `Host: ${process.host}\n` +
-
-                `PID: ${process.pid}`
-            );
-        }
-
-
-        return;
     }
 
 
-    // -------------------------------------------------------------
-    // START MONITOR
-    // -------------------------------------------------------------
-
-    const pid =
-        ns.run(
-            monitor.script,
-            1
-        );
-
-
-    if (
-        pid === 0
-    ) {
-
-        await showRamFailure(
-            ns,
-            monitor.script
-        );
-
-
-        return;
-    }
-
-
-    ns.toast(
-        `Started ${monitor.label}`,
-        "success",
-        2500
-    );
-
-
-    // Give script a moment to initialize its tail.
-
-    await ns.sleep(
-        100
-    );
-
-
-    try {
-
-        ns.ui.openTail(
-            pid
-        );
-
-    }
-    catch {
-
-        // Script normally opens its own tail anyway.
-    }
-}
-
-
-// =================================================================
-// OPEN ALL MONITORS
-// =================================================================
-
-async function openAllMonitors(
-    ns,
-    monitors,
-    network
-) {
-
-    let started = 0;
-
-    let opened = 0;
-
-    let missing = 0;
-
-    let failed = 0;
-
+    // =============================================================
+    // MONITOR STATUS DOTS
+    // =============================================================
 
     for (
         const monitor
-        of monitors
+        of MONITORS
     ) {
 
-        if (
-            !ns.fileExists(
-                monitor.script,
-                "home"
-            )
-        ) {
+        const status =
+            document.getElementById(
+                `${CONFIG.sidebarRootId}-state-${monitor.id}`
+            );
 
-            missing++;
+
+        if (
+            !status
+        ) {
 
             continue;
         }
@@ -901,77 +1479,247 @@ async function openAllMonitors(
             running.length > 0
         ) {
 
-            try {
-
-                ns.ui.openTail(
-                    running[0].pid
-                );
+            status.textContent =
+                "●";
 
 
-                opened++;
-
-            }
-            catch {
-
-                // Ignore UI failure.
-            }
+            status.style.color =
+                "#00c853";
 
 
-            continue;
+            status.title =
+                "Running";
         }
+        else {
+
+            status.textContent =
+                "●";
 
 
-        const pid =
-            ns.run(
-                monitor.script,
-                1
-            );
+            status.style.color =
+                "#666";
 
 
-        if (
-            pid === 0
-        ) {
-
-            failed++;
-
-            continue;
+            status.title =
+                "Stopped";
         }
-
-
-        started++;
-
-
-        await ns.sleep(
-            75
-        );
     }
 
 
-    await ns.alert(
+    // =============================================================
+    // DISPATCHER MENU STATUS
+    // =============================================================
 
-        "BB MONITORS\n\n" +
+    const dispatcherMenuStatus =
+        document.getElementById(
+            `${CONFIG.sidebarRootId}-state-dispatcher`
+        );
 
-        `Started: ${started}\n` +
 
-        `Already running: ${opened}\n` +
+    if (
+        dispatcherMenuStatus
+    ) {
 
-        `Missing: ${missing}\n` +
+        dispatcherMenuStatus.textContent =
+            "●";
 
-        `Failed: ${failed}`
-    );
+
+        dispatcherMenuStatus.style.color =
+            dispatcherRunning
+                ? "#00c853"
+                : "#666";
+    }
 }
 
 
 // =================================================================
-// DISPATCHER MENU
+// EXECUTE SIDEBAR COMMAND
 // =================================================================
 
-async function dispatcherMenu(
+async function executeSidebarCommand(
     ns,
-    network
+    command,
+    CONFIG,
+    MONITORS,
+    UTILITIES,
+    SUITE
 ) {
 
-    while (true) {
+    const network =
+        scanNetwork(
+            ns
+        );
+
+
+    // =============================================================
+    // CONTROL CENTER
+    // =============================================================
+
+    if (
+        command ===
+        "control"
+    ) {
+
+        try {
+
+            ns.ui.openTail(
+                ns.pid
+            );
+
+        }
+        catch {
+            // Ignore.
+        }
+
+
+        return (
+            "Opened BB Control Center"
+        );
+    }
+
+
+    // =============================================================
+    // MONITOR
+    // =============================================================
+
+    const monitor =
+        MONITORS.find(
+            item =>
+                item.id ===
+                command
+        );
+
+
+    if (
+        monitor
+    ) {
+
+        return await openOrStart(
+            ns,
+            monitor.script,
+            monitor.name,
+            network
+        );
+    }
+
+
+    // =============================================================
+    // OPEN ALL
+    // =============================================================
+
+    if (
+        command ===
+        "open-all"
+    ) {
+
+        let started = 0;
+
+        let opened = 0;
+
+        let failed = 0;
+
+
+        for (
+            const monitor
+            of MONITORS
+        ) {
+
+            const currentNetwork =
+                scanNetwork(
+                    ns
+                );
+
+
+            const running =
+                findProcessesByScript(
+                    ns,
+                    currentNetwork,
+                    monitor.script
+                );
+
+
+            if (
+                running.length > 0
+            ) {
+
+                try {
+
+                    ns.ui.openTail(
+                        running[0].pid
+                    );
+
+
+                    opened++;
+
+                }
+                catch {
+
+                    failed++;
+                }
+
+
+                continue;
+            }
+
+
+            const pid =
+                ns.run(
+                    monitor.script,
+                    1
+                );
+
+
+            if (
+                pid > 0
+            ) {
+
+                started++;
+
+
+                await ns.sleep(
+                    100
+                );
+            }
+            else {
+
+                failed++;
+            }
+        }
+
+
+        return (
+            `Open All: ${started} started, ${opened} opened, ${failed} failed`
+        );
+    }
+
+
+    // =============================================================
+    // DISPATCHER
+    // =============================================================
+
+    if (
+        command ===
+        "dispatcher"
+    ) {
+
+        if (
+            !verifyDispatcherWorkers(
+                ns
+            )
+        ) {
+
+            ns.toast(
+                "Dispatcher worker files missing",
+                "error",
+                3500
+            );
+
+
+            return (
+                "Dispatcher worker files missing"
+            );
+        }
+
 
         const running =
             findProcessesByScript(
@@ -981,86 +1729,8 @@ async function dispatcherMenu(
             );
 
 
-        const isRunning =
-            running.length > 0;
-
-
-        const options = [];
-
-
-        if (isRunning) {
-
-            options.push(
-                "👁 Open Dispatcher"
-            );
-
-            options.push(
-                "🔄 Restart Dispatcher"
-            );
-
-            options.push(
-                "🛑 Stop Dispatcher"
-            );
-        }
-        else {
-
-            options.push(
-                "▶ Start Dispatcher"
-            );
-
-            options.push(
-                "🧪 Start Dispatcher - Dry Run"
-            );
-        }
-
-
-        options.push(
-            "⚙ Start With Custom Settings"
-        );
-
-
-        options.push(
-            "← Back"
-        );
-
-
-        const choice =
-            await ns.prompt(
-
-                "HWGW DISPATCHER CONTROL\n\n" +
-
-                (
-                    isRunning
-                        ? `Status: RUNNING (${running.length} process)`
-                        : "Status: STOPPED"
-                ),
-
-                {
-                    type:
-                        "select",
-
-                    choices:
-                        options
-                }
-            );
-
-
         if (
-            !choice ||
-            choice === "← Back"
-        ) {
-
-            return;
-        }
-
-
-        // ========================================================
-        // OPEN
-        // ========================================================
-
-        if (
-            choice ===
-            "👁 Open Dispatcher"
+            running.length > 0
         ) {
 
             try {
@@ -1071,506 +1741,216 @@ async function dispatcherMenu(
 
             }
             catch {
-
-                await ns.alert(
-                    `Dispatcher PID: ${running[0].pid}`
-                );
+                // Ignore.
             }
 
 
-            continue;
+            return (
+                `Opened Dispatcher PID ${running[0].pid}`
+            );
         }
 
 
-        // ========================================================
-        // STOP
-        // ========================================================
+        const pid =
+            ns.run(
+                "bb-dispatcher.js",
+                1,
+                ...CONFIG.dispatcherDefaults
+            );
+
 
         if (
-            choice ===
-            "🛑 Stop Dispatcher"
+            pid === 0
         ) {
-
-            const stopped =
-                stopProcesses(
-                    ns,
-                    running
-                );
-
 
             ns.toast(
-                `Stopped ${stopped} dispatcher process(es)`,
-                "warning",
-                3000
+                "Could not start dispatcher",
+                "error",
+                3500
             );
 
 
-            continue;
+            return (
+                "Dispatcher failed to start"
+            );
         }
 
 
-        // ========================================================
-        // RESTART
-        // ========================================================
-
-        if (
-            choice ===
-            "🔄 Restart Dispatcher"
-        ) {
-
-            // Preserve first running dispatcher's arguments.
-
-            const args =
-                running[0].args ?? [];
-
-
-            stopProcesses(
-                ns,
-                running
-            );
-
-
-            await ns.sleep(
-                200
-            );
-
-
-            await startDispatcher(
-                ns,
-                args
-            );
-
-
-            continue;
-        }
-
-
-        // ========================================================
-        // DEFAULT START
-        // ========================================================
-
-        if (
-            choice ===
-            "▶ Start Dispatcher"
-        ) {
-
-            await startDispatcher(
-                ns,
-                [
-                    "--hack",
-                    0.05,
-
-                    "--reserve",
-                    8,
-
-                    "--gap",
-                    100,
-
-                    "--max-batches",
-                    25
-                ]
-            );
-
-
-            continue;
-        }
-
-
-        // ========================================================
-        // DRY RUN
-        // ========================================================
-
-        if (
-            choice ===
-            "🧪 Start Dispatcher - Dry Run"
-        ) {
-
-            await startDispatcher(
-                ns,
-                [
-                    "--hack",
-                    0.05,
-
-                    "--reserve",
-                    8,
-
-                    "--gap",
-                    100,
-
-                    "--max-batches",
-                    25,
-
-                    "--dry-run"
-                ]
-            );
-
-
-            continue;
-        }
-
-
-        // ========================================================
-        // CUSTOM
-        // ========================================================
-
-        if (
-            choice ===
-            "⚙ Start With Custom Settings"
-        ) {
-
-            await customDispatcherMenu(
-                ns,
-                running
-            );
-
-
-            continue;
-        }
-    }
-}
-
-
-// =================================================================
-// CUSTOM DISPATCHER MENU
-// =================================================================
-
-async function customDispatcherMenu(
-    ns,
-    running
-) {
-
-    // -------------------------------------------------------------
-    // TARGET
-    // -------------------------------------------------------------
-
-    const targetInput =
-        await ns.prompt(
-
-            "Dispatcher Target\n\n" +
-
-            "Leave blank for automatic target selection.",
-
-            {
-                type:
-                    "text"
-            }
-        );
-
-
-    if (
-        targetInput === false
-    ) {
-
-        return;
-    }
-
-
-    const target =
-        String(
-            targetInput ?? ""
-        ).trim();
-
-
-    if (
-        target &&
-        !ns.serverExists(target)
-    ) {
-
-        await ns.alert(
-            `Server does not exist:\n\n${target}`
-        );
-
-
-        return;
-    }
-
-
-    // -------------------------------------------------------------
-    // HACK FRACTION
-    // -------------------------------------------------------------
-
-    const hackInput =
-        await ns.prompt(
-
-            "Hack fraction per batch\n\n" +
-
-            "Examples:\n" +
-
-            "0.05 = 5%\n" +
-
-            "0.10 = 10%",
-
-            {
-                type:
-                    "text"
-            }
-        );
-
-
-    if (!hackInput) {
-        return;
-    }
-
-
-    const hack =
-        Number(
-            hackInput
-        );
-
-
-    if (
-        !Number.isFinite(hack) ||
-        hack <= 0 ||
-        hack > 0.50
-    ) {
-
-        await ns.alert(
-            "Hack fraction must be greater than 0 and no more than 0.50."
-        );
-
-
-        return;
-    }
-
-
-    // -------------------------------------------------------------
-    // HOME RAM RESERVE
-    // -------------------------------------------------------------
-
-    const reserveInput =
-        await ns.prompt(
-
-            "RAM to reserve on home (GB)",
-
-            {
-                type:
-                    "text"
-            }
-        );
-
-
-    if (!reserveInput) {
-        return;
-    }
-
-
-    const reserve =
-        Number(
-            reserveInput
-        );
-
-
-    if (
-        !Number.isFinite(reserve) ||
-        reserve < 0
-    ) {
-
-        await ns.alert(
-            "RAM reserve must be zero or greater."
-        );
-
-
-        return;
-    }
-
-
-    // -------------------------------------------------------------
-    // GAP
-    // -------------------------------------------------------------
-
-    const gapInput =
-        await ns.prompt(
-
-            "Landing gap in milliseconds\n\n" +
-
-            "Recommended starting value: 100",
-
-            {
-                type:
-                    "text"
-            }
-        );
-
-
-    if (!gapInput) {
-        return;
-    }
-
-
-    const gap =
-        Number(
-            gapInput
-        );
-
-
-    if (
-        !Number.isFinite(gap) ||
-        gap < 20
-    ) {
-
-        await ns.alert(
-            "Gap must be at least 20 ms."
-        );
-
-
-        return;
-    }
-
-
-    // -------------------------------------------------------------
-    // MAX BATCHES
-    // -------------------------------------------------------------
-
-    const batchInput =
-        await ns.prompt(
-
-            "Maximum parallel batches",
-
-            {
-                type:
-                    "text"
-            }
-        );
-
-
-    if (!batchInput) {
-        return;
-    }
-
-
-    const maxBatches =
-        Number(
-            batchInput
-        );
-
-
-    if (
-        !Number.isInteger(maxBatches) ||
-        maxBatches <= 0
-    ) {
-
-        await ns.alert(
-            "Maximum batches must be a positive whole number."
-        );
-
-
-        return;
-    }
-
-
-    // -------------------------------------------------------------
-    // DRY RUN?
-    // -------------------------------------------------------------
-
-    const dryRun =
-        await ns.prompt(
-
-            "Run in DRY RUN mode?\n\n" +
-
-            "Dry run performs analysis but does not launch workers.",
-
-            {
-                type:
-                    "boolean"
-            }
-        );
-
-
-    // -------------------------------------------------------------
-    // REPLACE EXISTING?
-    // -------------------------------------------------------------
-
-    if (
-        running.length > 0
-    ) {
-
-        const replace =
-            await ns.prompt(
-
-                "A dispatcher is already running.\n\n" +
-
-                "Stop it and start this configuration?",
-
-                {
-                    type:
-                        "boolean"
-                }
-            );
-
-
-        if (!replace) {
-            return;
-        }
-
-
-        stopProcesses(
-            ns,
-            running
+        ns.toast(
+            `Dispatcher started - PID ${pid}`,
+            "success",
+            2500
         );
 
 
         await ns.sleep(
-            200
+            100
+        );
+
+
+        try {
+
+            ns.ui.openTail(
+                pid
+            );
+
+        }
+        catch {
+            // Ignore.
+        }
+
+
+        return (
+            `Started Dispatcher PID ${pid}`
         );
     }
 
 
-    // -------------------------------------------------------------
-    // BUILD ARGS
-    // -------------------------------------------------------------
+    // =============================================================
+    // STOP DISPATCHER
+    // =============================================================
 
-    const args = [
+    if (
+        command ===
+        "stop-dispatcher"
+    ) {
 
-        "--hack",
-        hack,
+        const scripts = [
 
-        "--reserve",
-        reserve,
-
-        "--gap",
-        gap,
-
-        "--max-batches",
-        maxBatches
-    ];
+            "bb-dispatcher.js",
+            "bb-hack-worker.js",
+            "bb-grow-worker.js",
+            "bb-weaken-worker.js"
+        ];
 
 
-    if (target) {
+        let stopped = 0;
 
-        args.push(
-            "--target",
-            target
+
+        for (
+            const script
+            of scripts
+        ) {
+
+            const currentNetwork =
+                scanNetwork(
+                    ns
+                );
+
+
+            const processes =
+                findProcessesByScript(
+                    ns,
+                    currentNetwork,
+                    script
+                );
+
+
+            for (
+                const process
+                of processes
+            ) {
+
+                if (
+                    ns.kill(
+                        process.pid
+                    )
+                ) {
+
+                    stopped++;
+                }
+            }
+        }
+
+
+        ns.toast(
+            `Stopped ${stopped} dispatcher process(es)`,
+            "warning",
+            2500
+        );
+
+
+        return (
+            `Stopped ${stopped} dispatcher process(es)`
         );
     }
 
 
-    if (dryRun) {
+    // =============================================================
+    // UTILITY
+    // =============================================================
 
-        args.push(
-            "--dry-run"
+    const utility =
+        UTILITIES.find(
+            item =>
+                item.id ===
+                command
+        );
+
+
+    if (
+        utility
+    ) {
+
+        let script =
+            null;
+
+
+        for (
+            const candidate
+            of utility.scripts
+        ) {
+
+            if (
+                ns.fileExists(
+                    candidate,
+                    "home"
+                )
+            ) {
+
+                script =
+                    candidate;
+
+                break;
+            }
+        }
+
+
+        if (
+            !script
+        ) {
+
+            return (
+                `${utility.name} script not found`
+            );
+        }
+
+
+        return await openOrStart(
+            ns,
+            script,
+            utility.name,
+            network
         );
     }
 
 
-    await startDispatcher(
-        ns,
-        args
+    return (
+        `Unknown command: ${command}`
     );
 }
 
 
 // =================================================================
-// START DISPATCHER
+// OPEN OR START
 // =================================================================
 
-async function startDispatcher(
+async function openOrStart(
     ns,
-    args
+    script,
+    displayName,
+    network
 ) {
-
-    const script =
-        "bb-dispatcher.js";
-
 
     if (
         !ns.fileExists(
@@ -1579,417 +1959,16 @@ async function startDispatcher(
         )
     ) {
 
-        await ns.alert(
-            `Missing:\n\n${script}`
+        ns.toast(
+            `${script} not found`,
+            "error",
+            3000
         );
 
 
-        return false;
-    }
-
-
-    // -------------------------------------------------------------
-    // CHECK WORKERS
-    // -------------------------------------------------------------
-
-    const requiredWorkers = [
-
-        "bb-hack-worker.js",
-        "bb-grow-worker.js",
-        "bb-weaken-worker.js"
-    ];
-
-
-    const missingWorkers =
-        requiredWorkers.filter(
-            file =>
-                !ns.fileExists(
-                    file,
-                    "home"
-                )
+        return (
+            `${displayName} missing`
         );
-
-
-    if (
-        missingWorkers.length > 0
-    ) {
-
-        await ns.alert(
-
-            "DISPATCHER CANNOT START\n\n" +
-
-            "Missing worker files:\n\n" +
-
-            missingWorkers.join(
-                "\n"
-            )
-        );
-
-
-        return false;
-    }
-
-
-    // -------------------------------------------------------------
-    // START
-    // -------------------------------------------------------------
-
-    const pid =
-        ns.run(
-            script,
-            1,
-            ...args
-        );
-
-
-    if (
-        pid === 0
-    ) {
-
-        await showRamFailure(
-            ns,
-            script
-        );
-
-
-        return false;
-    }
-
-
-    ns.toast(
-        `Dispatcher started — PID ${pid}`,
-        "success",
-        3500
-    );
-
-
-    await ns.sleep(
-        100
-    );
-
-
-    try {
-
-        ns.ui.openTail(
-            pid
-        );
-
-    }
-    catch {
-
-        // Dispatcher opens its own window.
-    }
-
-
-    return true;
-}
-
-
-// =================================================================
-// SUITE STATUS
-// =================================================================
-
-async function showSuiteStatus(
-    ns,
-    CONFIG,
-    network
-) {
-
-    const lines = [];
-
-
-    let totalProcesses = 0;
-
-    let totalThreads = 0;
-
-    let totalRam = 0;
-
-
-    lines.push(
-        "BITBURNER SUITE STATUS"
-    );
-
-
-    lines.push(
-        "═".repeat(70)
-    );
-
-
-    for (
-        const script
-        of CONFIG.suiteScripts
-    ) {
-
-        if (
-            script ===
-            "bb-control.js"
-        ) {
-
-            continue;
-        }
-
-
-        const available =
-            ns.fileExists(
-                script,
-                "home"
-            );
-
-
-        const processes =
-            findProcessesByScript(
-                ns,
-                network,
-                script
-            );
-
-
-        if (!available) {
-
-            lines.push(
-                `${script.padEnd(30)} MISSING`
-            );
-
-
-            continue;
-        }
-
-
-        if (
-            processes.length === 0
-        ) {
-
-            lines.push(
-                `${script.padEnd(30)} STOPPED`
-            );
-
-
-            continue;
-        }
-
-
-        const threads =
-            processes.reduce(
-                (sum, p) =>
-                    sum +
-                    p.threads,
-                0
-            );
-
-
-        let ram = 0;
-
-
-        for (
-            const process
-            of processes
-        ) {
-
-            const ramPerThread =
-                ns.getScriptRam(
-                    process.filename,
-                    process.host
-                );
-
-
-            ram +=
-                ramPerThread *
-                process.threads;
-        }
-
-
-        totalProcesses +=
-            processes.length;
-
-
-        totalThreads +=
-            threads;
-
-
-        totalRam +=
-            ram;
-
-
-        lines.push(
-
-            `${script.padEnd(30)}` +
-
-            `RUNNING  ` +
-
-            `P:${processes.length}` +
-
-            `  T:${threads}` +
-
-            `  RAM:${ns.format.ram(ram)}`
-        );
-    }
-
-
-    lines.push("");
-
-
-    lines.push(
-        "─".repeat(70)
-    );
-
-
-    lines.push(
-        `Processes: ${totalProcesses}`
-    );
-
-
-    lines.push(
-        `Threads: ${totalThreads}`
-    );
-
-
-    lines.push(
-        `RAM: ${ns.format.ram(totalRam)}`
-    );
-
-
-    await ns.alert(
-        lines.join("\n")
-    );
-}
-
-
-// =================================================================
-// SHOW ALL PROCESSES
-// =================================================================
-
-async function showAllProcesses(
-    ns,
-    network
-) {
-
-    const lines = [];
-
-
-    let totalProcesses = 0;
-
-    let totalThreads = 0;
-
-
-    for (
-        const server
-        of network
-    ) {
-
-        const processes =
-            ns.ps(server);
-
-
-        if (
-            processes.length === 0
-        ) {
-
-            continue;
-        }
-
-
-        lines.push("");
-
-
-        lines.push(
-            `════ ${server} ════`
-        );
-
-
-        for (
-            const process
-            of processes
-        ) {
-
-            totalProcesses++;
-
-            totalThreads +=
-                process.threads;
-
-
-            const args =
-                process.args.length > 0
-                    ? ` | ${process.args.join(" ")}`
-                    : "";
-
-
-            lines.push(
-
-                `${process.filename}` +
-
-                ` | T:${process.threads}` +
-
-                ` | PID:${process.pid}` +
-
-                args
-            );
-        }
-    }
-
-
-    const header =
-
-        "RUNNING SCRIPT SUMMARY\n\n" +
-
-        `Processes: ${totalProcesses}\n` +
-
-        `Threads: ${totalThreads}\n`;
-
-
-    if (
-        lines.length === 0
-    ) {
-
-        await ns.alert(
-            header +
-            "\nNo scripts are running."
-        );
-
-
-        return;
-    }
-
-
-    await ns.alert(
-
-        header +
-        lines.join("\n")
-    );
-}
-
-
-// =================================================================
-// LAUNCH UTILITY
-// =================================================================
-
-async function launchUtility(
-    ns,
-    utility,
-    network
-) {
-
-    const script =
-        findExistingUtilityScript(
-            ns,
-            utility
-        );
-
-
-    if (!script) {
-
-        await ns.alert(
-
-            `${utility.label}\n\n` +
-
-            "No matching script exists on home.\n\n" +
-
-            utility.scripts.join(
-                "\n"
-            )
-        );
-
-
-        return;
     }
 
 
@@ -2000,6 +1979,10 @@ async function launchUtility(
             script
         );
 
+
+    // =============================================================
+    // ALREADY RUNNING
+    // =============================================================
 
     if (
         running.length > 0
@@ -2011,31 +1994,21 @@ async function launchUtility(
                 running[0].pid
             );
 
-
-            ns.toast(
-                `Opened ${utility.label}`,
-                "info",
-                2500
-            );
-
-
-            return;
-
         }
         catch {
-
-            await ns.alert(
-
-                `${utility.label} is running.\n\n` +
-
-                `PID: ${running[0].pid}`
-            );
-
-
-            return;
+            // Ignore.
         }
+
+
+        return (
+            `Opened ${displayName} PID ${running[0].pid}`
+        );
     }
 
+
+    // =============================================================
+    // START SCRIPT
+    // =============================================================
 
     const pid =
         ns.run(
@@ -2048,20 +2021,23 @@ async function launchUtility(
         pid === 0
     ) {
 
-        await showRamFailure(
-            ns,
-            script
+        ns.toast(
+            `Could not start ${script}`,
+            "error",
+            3000
         );
 
 
-        return;
+        return (
+            `${displayName} failed to start`
+        );
     }
 
 
     ns.toast(
-        `Started ${utility.label}`,
+        `${displayName} started`,
         "success",
-        2500
+        2000
     );
 
 
@@ -2078,110 +2054,26 @@ async function launchUtility(
 
     }
     catch {
-
-        // Utility may not have a tail.
-    }
-}
-
-
-// =================================================================
-// STOP BB SUITE
-// =================================================================
-
-async function stopSuite(
-    ns,
-    CONFIG,
-    network
-) {
-
-    const processes = [];
-
-
-    for (
-        const script
-        of CONFIG.suiteScripts
-    ) {
-
-        if (
-            script ===
-            "bb-control.js"
-        ) {
-
-            continue;
-        }
-
-
-        processes.push(
-            ...findProcessesByScript(
-                ns,
-                network,
-                script
-            )
-        );
+        // Script may open itself.
     }
 
 
-    if (
-        processes.length === 0
-    ) {
-
-        await ns.alert(
-            "No BB suite processes are currently running."
-        );
-
-
-        return;
-    }
-
-
-    const confirmed =
-        await ns.prompt(
-
-            `Stop ${processes.length} BB suite process(es)?\n\n` +
-
-            "This includes dispatcher workers currently running.",
-
-            {
-                type:
-                    "boolean"
-            }
-        );
-
-
-    if (!confirmed) {
-        return;
-    }
-
-
-    const stopped =
-        stopProcesses(
-            ns,
-            processes
-        );
-
-
-    ns.toast(
-        `Stopped ${stopped} BB suite process(es)`,
-        "warning",
-        3500
+    return (
+        `Started ${displayName} PID ${pid}`
     );
 }
 
 
 // =================================================================
-// STOP PROCESS LIST
+// FIND OTHER CONTROL PROCESS
 // =================================================================
 
-function stopProcesses(
-    ns,
-    processes
-) {
+function findOtherControlProcess(ns) {
 
-    let stopped = 0;
-
-
-    const seen =
-        new Set();
+    const processes =
+        ns.ps(
+            "home"
+        );
 
 
     for (
@@ -2190,58 +2082,24 @@ function stopProcesses(
     ) {
 
         if (
-            seen.has(
-                process.pid
-            )
+            process.filename !==
+            "bb-control.js"
         ) {
 
             continue;
         }
 
 
-        seen.add(
-            process.pid
-        );
-
-
         if (
-            ns.kill(
-                process.pid
-            )
+            process.pid ===
+            ns.pid
         ) {
 
-            stopped++;
+            continue;
         }
-    }
 
 
-    return stopped;
-}
-
-
-// =================================================================
-// FIND UTILITY SCRIPT
-// =================================================================
-
-function findExistingUtilityScript(
-    ns,
-    utility
-) {
-
-    for (
-        const script
-        of utility.scripts
-    ) {
-
-        if (
-            ns.fileExists(
-                script,
-                "home"
-            )
-        ) {
-
-            return script;
-        }
+        return process;
     }
 
 
@@ -2250,7 +2108,31 @@ function findExistingUtilityScript(
 
 
 // =================================================================
-// FIND RUNNING SCRIPT ACROSS NETWORK
+// VERIFY DISPATCHER WORKERS
+// =================================================================
+
+function verifyDispatcherWorkers(ns) {
+
+    const workers = [
+
+        "bb-hack-worker.js",
+        "bb-grow-worker.js",
+        "bb-weaken-worker.js"
+    ];
+
+
+    return workers.every(
+        script =>
+            ns.fileExists(
+                script,
+                "home"
+            )
+    );
+}
+
+
+// =================================================================
+// FIND PROCESSES
 // =================================================================
 
 function findProcessesByScript(
@@ -2259,7 +2141,8 @@ function findProcessesByScript(
     filename
 ) {
 
-    const results = [];
+    const results =
+        [];
 
 
     for (
@@ -2267,8 +2150,20 @@ function findProcessesByScript(
         of network
     ) {
 
+        if (
+            !ns.hasRootAccess(
+                host
+            )
+        ) {
+
+            continue;
+        }
+
+
         const processes =
-            ns.ps(host);
+            ns.ps(
+                host
+            );
 
 
         for (
@@ -2300,56 +2195,87 @@ function findProcessesByScript(
 
 
 // =================================================================
-// RAM ERROR
+// SYSTEM STATS
 // =================================================================
 
-async function showRamFailure(
+function getSystemStats(
     ns,
-    script
+    network
 ) {
 
-    const scriptRam =
-        ns.getScriptRam(
-            script,
-            "home"
-        );
+    let rooted = 0;
+
+    let maxRam = 0;
+
+    let usedRam = 0;
 
 
-    const maxRam =
-        ns.getServerMaxRam(
-            "home"
-        );
+    for (
+        const server
+        of network
+    ) {
+
+        if (
+            !ns.hasRootAccess(
+                server
+            )
+        ) {
+
+            continue;
+        }
 
 
-    const usedRam =
-        ns.getServerUsedRam(
-            "home"
-        );
+        rooted++;
 
 
-    const freeRam =
-        Math.max(
-            0,
-            maxRam -
-            usedRam
-        );
+        maxRam +=
+            ns.getServerMaxRam(
+                server
+            );
 
 
-    await ns.alert(
+        usedRam +=
+            ns.getServerUsedRam(
+                server
+            );
+    }
 
-        `Could not start ${script}\n\n` +
 
-        `Script RAM: ${ns.format.ram(scriptRam)}\n` +
+    return {
 
-        `Home Free RAM: ${ns.format.ram(freeRam)}\n\n` +
+        hackLevel:
+            ns.getHackingLevel(),
 
-        "Close another script or increase home RAM."
-    );
+        money:
+            ns.getServerMoneyAvailable(
+                "home"
+            ),
+
+        income:
+            ns.getTotalScriptIncome()[0],
+
+        serverCount:
+            network.length,
+
+        rooted,
+
+        maxRam,
+
+        usedRam,
+
+        ramPercent:
+            maxRam > 0
+                ? (
+                    usedRam /
+                    maxRam
+                ) * 100
+                : 0
+    };
 }
 
 
 // =================================================================
-// NETWORK SCANNER
+// NETWORK SCAN
 // =================================================================
 
 function scanNetwork(ns) {
@@ -2358,13 +2284,16 @@ function scanNetwork(ns) {
         new Set();
 
 
-    const servers = [];
+    const servers =
+        [];
 
 
     function scan(server) {
 
         if (
-            visited.has(server)
+            visited.has(
+                server
+            )
         ) {
 
             return;
@@ -2383,7 +2312,9 @@ function scanNetwork(ns) {
 
         for (
             const neighbor
-            of ns.scan(server)
+            of ns.scan(
+                server
+            )
         ) {
 
             scan(
@@ -2399,4 +2330,36 @@ function scanNetwork(ns) {
 
 
     return servers;
+}
+
+
+// =================================================================
+// CENTER TEXT
+// =================================================================
+
+function centerText(
+    text,
+    width
+) {
+
+    const padding =
+        Math.max(
+            0,
+
+            Math.floor(
+                (
+                    width -
+                    text.length
+                ) /
+                2
+            )
+        );
+
+
+    return (
+        " ".repeat(
+            padding
+        ) +
+        text
+    );
 }
