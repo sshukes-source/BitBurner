@@ -206,7 +206,7 @@ export async function main(ns) {
 
             // Skip home because its money represents player money
             if (server === "home") {
-               // continue;
+                continue;
             }
 
             const processes = ns.ps(server);

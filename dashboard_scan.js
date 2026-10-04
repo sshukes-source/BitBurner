@@ -8,7 +8,7 @@ export async function main(ns) {
     ns.disableLog("ALL");
 
     ns.ui.openTail();
-    ns.ui.resizeTail(1050, 480);
+    ns.ui.resizeTail(1050, 520);
 
     let lastDisplay = "";
 
@@ -26,7 +26,8 @@ export async function main(ns) {
         // PLAYER INFORMATION
         // ========================================================
 
-        const playerHackLevel = ns.getHackingLevel();
+        const playerHackLevel =
+            ns.getHackingLevel();
 
         const playerMoney =
             ns.getServerMoneyAvailable("home");
@@ -106,9 +107,9 @@ export async function main(ns) {
                 portsAvailable >= portsNeeded;
 
 
-            // ----------------------------------------------------
-            // Determine target status
-            // ----------------------------------------------------
+            // ====================================================
+            // STATUS
+            // ====================================================
 
             let status = "READY";
 
@@ -136,21 +137,78 @@ export async function main(ns) {
 
 
         // ========================================================
-        // SORT TARGETS
+        // SPLIT INTO READY / LOCKED
+        // ========================================================
+
+        const readyServers =
+            serverData.filter(server =>
+                server.canHack &&
+                server.canNuke
+            );
+
+        const lockedServers =
+            serverData.filter(server =>
+                !server.canHack ||
+                !server.canNuke
+            );
+
+
+        // ========================================================
+        // SORT READY SERVERS
         //
-        // 1. Lowest required hacking level
-        // 2. Lowest required ports
+        // Highest money first
+        // ========================================================
+
+        readyServers.sort((a, b) => {
+
+            if (b.maxMoney !== a.maxMoney) {
+                return b.maxMoney - a.maxMoney;
+            }
+
+            return a.hackLevel - b.hackLevel;
+        });
+
+
+        // ========================================================
+        // SORT LOCKED SERVERS
+        //
+        // 1. Closest hacking level
+        // 2. Fewest missing ports
         // 3. Highest money
         // ========================================================
 
-        serverData.sort((a, b) => {
+        lockedServers.sort((a, b) => {
 
-            if (a.hackLevel !== b.hackLevel) {
-                return a.hackLevel - b.hackLevel;
+            const hackGapA =
+                Math.max(
+                    0,
+                    a.hackLevel - playerHackLevel
+                );
+
+            const hackGapB =
+                Math.max(
+                    0,
+                    b.hackLevel - playerHackLevel
+                );
+
+            if (hackGapA !== hackGapB) {
+                return hackGapA - hackGapB;
             }
 
-            if (a.portsNeeded !== b.portsNeeded) {
-                return a.portsNeeded - b.portsNeeded;
+            const portGapA =
+                Math.max(
+                    0,
+                    a.portsNeeded - portsAvailable
+                );
+
+            const portGapB =
+                Math.max(
+                    0,
+                    b.portsNeeded - portsAvailable
+                );
+
+            if (portGapA !== portGapB) {
+                return portGapA - portGapB;
             }
 
             return b.maxMoney - a.maxMoney;
@@ -158,11 +216,55 @@ export async function main(ns) {
 
 
         // ========================================================
-        // TOP 10 TARGETS
+        // SELECT DISPLAY TARGETS
+        //
+        // Up to:
+        // 5 READY
+        // 5 LOCKED
+        //
+        // If one group has fewer than 5,
+        // fill remaining slots from the other group.
         // ========================================================
 
-        const topServers =
-            serverData.slice(0, 10);
+        const MAX_DISPLAY = 10;
+        const TARGET_READY = 5;
+
+        const displayedReady =
+            readyServers.slice(
+                0,
+                TARGET_READY
+            );
+
+        let remainingSlots =
+            MAX_DISPLAY -
+            displayedReady.length;
+
+        const displayedLocked =
+            lockedServers.slice(
+                0,
+                remainingSlots
+            );
+
+        remainingSlots =
+            MAX_DISPLAY -
+            displayedReady.length -
+            displayedLocked.length;
+
+        // If we don't have enough locked servers,
+        // fill the remaining slots with more ready servers.
+        if (remainingSlots > 0) {
+
+            const moreReady =
+                readyServers.slice(
+                    displayedReady.length,
+                    displayedReady.length +
+                    remainingSlots
+                );
+
+            displayedReady.push(
+                ...moreReady
+            );
+        }
 
 
         // ========================================================
@@ -193,6 +295,17 @@ export async function main(ns) {
             "─".repeat(width)
         );
 
+
+        // ========================================================
+        // READY TARGETS
+        // ========================================================
+
+        lines.push("");
+
+        lines.push(
+            ` READY TARGETS (${readyServers.length})`
+        );
+
         lines.push("");
 
         lines.push(
@@ -214,13 +327,9 @@ export async function main(ns) {
         );
 
 
-        // ========================================================
-        // SERVER ROWS
-        // ========================================================
-
         let index = 1;
 
-        for (const data of topServers) {
+        for (const data of displayedReady) {
 
             lines.push(
                 index.toString()
@@ -238,14 +347,94 @@ export async function main(ns) {
                     .toString()
                     .padStart(8) +
 
-                formatMoney(ns, data.maxMoney)
-                    .padStart(18) +
+                formatMoney(
+                    ns,
+                    data.maxMoney
+                ).padStart(18) +
 
                 data.status
                     .padStart(18)
             );
 
             index++;
+        }
+
+
+        if (displayedReady.length === 0) {
+
+            lines.push(
+                "     No servers currently ready."
+            );
+        }
+
+
+        // ========================================================
+        // LOCKED / UPCOMING TARGETS
+        // ========================================================
+
+        lines.push("");
+
+        lines.push(
+            ` UPCOMING TARGETS (${lockedServers.length})`
+        );
+
+        lines.push("");
+
+        lines.push(
+            " # ".padEnd(5) +
+            "SERVER".padEnd(25) +
+            "HACK".padStart(8) +
+            "PORTS".padStart(8) +
+            "MAX MONEY".padStart(18) +
+            "STATUS".padStart(18)
+        );
+
+        lines.push(
+            "─── " +
+            "─────────────────────── " +
+            "─────── " +
+            "─────── " +
+            "───────────────── " +
+            "─────────────────"
+        );
+
+
+        for (const data of displayedLocked) {
+
+            lines.push(
+                index.toString()
+                    .padStart(2) +
+                "   " +
+
+                data.server
+                    .padEnd(25) +
+
+                data.hackLevel
+                    .toString()
+                    .padStart(8) +
+
+                data.portsNeeded
+                    .toString()
+                    .padStart(8) +
+
+                formatMoney(
+                    ns,
+                    data.maxMoney
+                ).padStart(18) +
+
+                data.status
+                    .padStart(18)
+            );
+
+            index++;
+        }
+
+
+        if (displayedLocked.length === 0) {
+
+            lines.push(
+                "     No locked targets remaining."
+            );
         }
 
 
@@ -259,15 +448,14 @@ export async function main(ns) {
             "─".repeat(width)
         );
 
-        const readyCount =
-            serverData.filter(server =>
-                server.canHack &&
-                server.canNuke
-            ).length;
-
         lines.push(
-            ` Showing ${topServers.length} of ${serverData.length} unrooted servers` +
-            `  |  Ready now: ${readyCount}`
+            ` Unrooted: ${serverData.length}` +
+            `  |  Ready: ${readyServers.length}` +
+            `  |  Locked: ${lockedServers.length}` +
+            `  |  Showing: ${
+                displayedReady.length +
+                displayedLocked.length
+            }`
         );
 
         lines.push(
@@ -285,8 +473,6 @@ export async function main(ns) {
 
         // ========================================================
         // REDRAW ONLY WHEN DATA CHANGES
-        //
-        // This prevents the tail window from flashing every second.
         // ========================================================
 
         if (display !== lastDisplay) {
@@ -297,12 +483,13 @@ export async function main(ns) {
                 ns.print(line);
             }
 
-            lastDisplay = display;
+            lastDisplay =
+                display;
         }
 
 
         // ========================================================
-        // REFRESH CHECK
+        // REFRESH
         // ========================================================
 
         await ns.sleep(1000);
@@ -311,12 +498,7 @@ export async function main(ns) {
 
 
 /**
- * Format money consistently for dashboard display.
- *
- * Examples:
- * $950.00k
- * $12.50m
- * $1.75b
+ * Format money consistently.
  *
  * @param {NS} ns
  * @param {number} value
